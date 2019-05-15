@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import cartopy.crs as ccrs
 import os
+import argparse
 
 
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
@@ -28,17 +29,17 @@ def normalize_height_field(zz,normalized_maximum=7990.):
 def make_global(seed):
     print("generating global height field")
     planet_string="./planet \
-    -s %d \
-    -o temp_global.asc \
-    -w 1000 \
-    -h 500 \
+    -s %f \
+    -o temp_%s_global.asc \
+    -w 4000 \
+    -h 2000 \
     -H \
     -n \
-    -p q" % seed
+    -p q" % (seed, str(seed).zfill(3))
     os.system(planet_string)
-    data = np.loadtxt('temp_global.asc')
-    lat = np.linspace(90., -90., 500)
-    lon = np.linspace(-180., 180., 1000)
+    data = np.loadtxt('temp_'+str(seed).zfill(3)+'_global.asc')
+    lat = np.linspace(90., -90., 2000)
+    lon = np.linspace(-180., 180., 4000)
     xx, yy = np.meshgrid(lon,lat)
     return xx, yy, normalize_height_field(data)
 
@@ -46,8 +47,8 @@ def make_global(seed):
 def make_zoom(seed, lon0, lat0, zoom):
     print("Generating zoomed height field")
     planet_string="./planet \
-    -s %d \
-    -o temp_zoom.asc \
+    -s %f \
+    -o %s_temp_zoom.asc \
     -l %f \
     -L %f \
     -m %f \
@@ -55,9 +56,9 @@ def make_zoom(seed, lon0, lat0, zoom):
     -h 500 \
     -H \
     -n \
-    -p q" % (seed, lon0, lat0, zoom)
+    -p s" % (seed, str(seed).zfill(3), lon0, lat0, zoom)
     os.system(planet_string)
-    data = np.loadtxt('temp_zoom.asc')
+    data = np.loadtxt(str(seed).zfill(3)+'temp_zoom.asc')
     # lat boundaries
     lon_min = lon0-180./zoom
     lon_max = lon0+180./zoom
@@ -70,9 +71,9 @@ def make_zoom(seed, lon0, lat0, zoom):
 
 
 def main():
-    seed = 333
+    # seed = 666
     xx, yy, data = make_global(seed)
-    xx_zoom, yy_zoom, data_zoom = make_zoom(seed,100,-10,6)
+    #xx_zoom, yy_zoom, data_zoom = make_zoom(seed,103,-49,20)
     #data_zoom = 10**-6*1900*np.loadtxt('49_zoom.asc')
     #lat_zoom = np.linspace(10.,-50., 1000)
     #lon_zoom = np.linspace(-70.,-10., 1000)
@@ -82,8 +83,8 @@ def main():
     #lon = np.linspace(-180., 180., 1000)
     #xx, yy = np.meshgrid(lon,lat)
     #xx_zoom, yy_zoom = np.meshgrid(lon_zoom,lat_zoom)
-    print(data.min())
-    print(data.max())
+    print("global min: %f, global max: %f" % (data.min(), data.max()))
+    #print("global min: %f, global max: %f" % (data_zoom.min(), data_zoom.max()))
 
     # generate colormaps and norms for sea and land
     cmap = plt.get_cmap('terrain')
@@ -95,34 +96,61 @@ def main():
     norm_land = colors.BoundaryNorm(boundaries=levels_land, ncolors=256)
 
     #fig, ax = plt.subplots(2,2,figsize=(8,8),dpi=150)
-    fig, (ax_global, ax_zoom) = plt.subplots(2,1, figsize=(16,16), dpi=160, subplot_kw={'projection': ccrs.Robinson()})
+    fig, ax_global = plt.subplots(1,1, figsize=(32,32), dpi=160, 
+        subplot_kw={'projection': ccrs.NorthPolarStereo()})
+            # central_longitude=0.,central_latitude=-90.)})
+    #fig, ax_global = plt.subplots(1,1, figsize=(32,32), dpi=160, subplot_kw={'projection': ccrs.Robinson()})
+    #fig, (ax_global, ax_zoom) = plt.subplots(2,1, figsize=(16,16), dpi=160, subplot_kw={'projection': ccrs.Robinson()})
     #gridspec.GridSpec(2,4)
     
     #ax_global = fig.add_subplot(2,1,1, projection=ccrs.Mollweide())
-    cs = ax_global.contourf(xx,yy,data,levels=levels_sea, cmap='Blues_r',norm=norm_sea, transform=ccrs.PlateCarree())
-    cl = ax_global.contourf(xx,yy,data,levels=levels_land,cmap=cmap_land,norm=norm_land,transform=ccrs.PlateCarree())
-    ax_global.contour(xx,yy,data,levels=[0.],linewidths=1.,colors='black',transform=ccrs.PlateCarree())
+    cs = ax_global.contourf(xx,yy,data,levels=levels_sea, cmap='Blues_r',norm=norm_sea, transform=ccrs.PlateCarree(),extend="min")
+    cs.cmap.set_under('k')
+    cl = ax_global.contourf(xx,yy,data,levels=levels_land,cmap=cmap_land,norm=norm_land,transform=ccrs.PlateCarree(),extend="max")
+    cs.cmap.set_over('k')
+    ax_global.contour(xx,yy,data,levels=[0.],linewidths=0.5,colors='black',transform=ccrs.PlateCarree())
+    ax_global.set_extent([-180,180.,60.,90.],ccrs.PlateCarree())
+    # ax_global.set_extent([-185,-105.,-80.,-25.],ccrs.PlateCarree())
     gl = ax_global.gridlines(crs=ccrs.PlateCarree(),#draw_labels=True,
-                  linewidth=0.333, color='black')
-    gl.xlocator = mticker.FixedLocator(np.arange(-180,190,10))
-    gl.ylocator = mticker.FixedLocator(np.arange(-90,100,10))
+                  linewidth=0.4, color='black')
+    gl.xlocator = mticker.FixedLocator(np.arange(-180,190,30))
+    gl.ylocator = mticker.FixedLocator(np.arange(-90,100,30))
+    gl.n_steps = 200
+    gl = ax_global.gridlines(crs=ccrs.PlateCarree(),#draw_labels=True,
+                  linewidth=0.15, color='black')
+    gl.xlocator = mticker.FixedLocator(np.arange(-180,190,5))
+    gl.ylocator = mticker.FixedLocator(np.arange(-90,100,5))
+    gl.n_steps = 200
     #plt.subplot2grid((2,4),(1,0),colspan=3)
     #ax_zoom = plt.subplot(2,1,2)
-    cs_zoom = ax_zoom.contourf(xx_zoom,yy_zoom,data_zoom,levels=levels_sea,cmap='Blues_r',norm=norm_sea)
-    cl_zoom = ax_zoom.contourf(xx_zoom,yy_zoom,data_zoom,levels=levels_land,cmap=cmap_land,norm=norm_land)
-    ax_zoom.contour(xx_zoom,yy_zoom,data_zoom,levels=[0.],linewidths=1.,colors='black')
-    plt.ylim((yy_zoom.min(),yy_zoom.max()))
-    plt.xlim((xx_zoom.min(),xx_zoom.max()))
-    gl = ax_zoom.gridlines(crs=ccrs.PlateCarree(),#draw_labels=True,
-                  linewidth=0.333, color='black')
-    gl.xlocator = mticker.FixedLocator(np.arange(-180,190,10))
-    gl.ylocator = mticker.FixedLocator(np.arange(-90,100,10))
-    # plt.subplot2grid((2,2),(1,1))
-    fig.colorbar(cs)
-    fig.colorbar(cl)
-    plt.savefig('49.png')
+    # try:
+    #     cs_zoom = ax_zoom.contourf(xx_zoom,yy_zoom,data_zoom,levels=levels_sea,cmap='Blues_r',norm=norm_sea)
+    # except:
+    #     print('no sea')
+    # try:
+    #     cl_zoom = ax_zoom.contourf(xx_zoom,yy_zoom,data_zoom,levels=levels_land,cmap=cmap_land,norm=norm_land)
+    # except:
+    #     print('no land')
+    # try:
+    #     ax_zoom.contour(xx_zoom,yy_zoom,data_zoom,levels=[0.],linewidths=0.5,colors='black')
+    # except:
+    #     print('no coastline')
+    # plt.ylim((yy_zoom.min(),yy_zoom.max()))
+    # plt.xlim((xx_zoom.min(),xx_zoom.max()))
+    # gl = ax_zoom.gridlines(crs=ccrs.PlateCarree(),#draw_labels=True,
+    #               linewidth=0.333, color='black')
+    # gl.xlocator = mticker.FixedLocator(np.arange(-180,190,1))
+    # gl.ylocator = mticker.FixedLocator(np.arange(-90,100,1))
+    # # plt.subplot2grid((2,2),(1,1))
+    fig.colorbar(cs,orientation="horizontal")
+    fig.colorbar(cl,orientation="horizontal")
+    plt.savefig('SSS_'+str(seed).zfill(3)+'_XHR_NorthPole.png')
     # plt.show()
 
+parser = argparse.ArgumentParser()
+parser.add_argument("seed", type=float, default=12345)
+args = parser.parse_args()
+seed = args.seed
 
 if __name__ == '__main__':
 	main()
