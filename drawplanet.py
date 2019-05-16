@@ -7,7 +7,7 @@ import pandas as pd
 import cartopy.crs as ccrs
 import os
 import argparse
-
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 def truncate_colormap(cmap, minval=0.0, maxval=1.0, n=100):
     new_cmap = colors.LinearSegmentedColormap.from_list(
@@ -97,8 +97,9 @@ def main():
 
     #fig, ax = plt.subplots(2,2,figsize=(8,8),dpi=150)
     fig, ax_global = plt.subplots(1,1, figsize=(32,32), dpi=160, 
-        subplot_kw={'projection': ccrs.NorthPolarStereo()})
-            # central_longitude=0.,central_latitude=-90.)})
+        subplot_kw={'projection': ccrs.Stereographic( #)})
+            central_longitude=-15.,central_latitude=-30.)}) #,
+            # standard_parallels=(30.,50.))})
     #fig, ax_global = plt.subplots(1,1, figsize=(32,32), dpi=160, subplot_kw={'projection': ccrs.Robinson()})
     #fig, (ax_global, ax_zoom) = plt.subplots(2,1, figsize=(16,16), dpi=160, subplot_kw={'projection': ccrs.Robinson()})
     #gridspec.GridSpec(2,4)
@@ -109,7 +110,21 @@ def main():
     cl = ax_global.contourf(xx,yy,data,levels=levels_land,cmap=cmap_land,norm=norm_land,transform=ccrs.PlateCarree(),extend="max")
     cs.cmap.set_over('k')
     ax_global.contour(xx,yy,data,levels=[0.],linewidths=0.5,colors='black',transform=ccrs.PlateCarree())
-    ax_global.set_extent([-180,180.,60.,90.],ccrs.PlateCarree())
+    ax_global.set_extent([-25.,-5.,-40.,-20.],ccrs.PlateCarree())
+    ax_col_land = inset_axes(ax_global,
+        width="49%",
+        height="2.5%",
+        loc="lower right",
+        bbox_to_anchor=(0.,-0.08,1,1),
+        bbox_transform=ax_global.transAxes,
+        borderpad=0.1)
+    ax_col_sea = inset_axes(ax_global,
+        width="49%",
+        height="2.5%",
+        loc="lower left",
+        bbox_to_anchor=(0.,-0.08,1,1),
+        bbox_transform=ax_global.transAxes,
+        borderpad=0.1)
     # ax_global.set_extent([-185,-105.,-80.,-25.],ccrs.PlateCarree())
     gl = ax_global.gridlines(crs=ccrs.PlateCarree(),#draw_labels=True,
                   linewidth=0.4, color='black')
@@ -142,9 +157,12 @@ def main():
     # gl.xlocator = mticker.FixedLocator(np.arange(-180,190,1))
     # gl.ylocator = mticker.FixedLocator(np.arange(-90,100,1))
     # # plt.subplot2grid((2,2),(1,1))
-    fig.colorbar(cs,orientation="horizontal")
-    fig.colorbar(cl,orientation="horizontal")
-    plt.savefig('SSS_'+str(seed).zfill(3)+'_XHR_NorthPole.png')
+    scbar = fig.colorbar(cs, cax=ax_col_sea, orientation="horizontal")
+    scbar.ax.tick_params(labelsize=25)
+    lcbar = fig.colorbar(cl, cax=ax_col_land, orientation="horizontal")
+    lcbar.ax.tick_params(labelsize=25)
+
+    plt.savefig('SSS_'+str(seed).zfill(3)+'_XHR_coast.png')
     # plt.show()
 
 parser = argparse.ArgumentParser()
